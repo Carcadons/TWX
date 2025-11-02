@@ -1,0 +1,171 @@
+# TWX - Digital Temporary Works Inspection
+
+## Overview
+
+TWX is a web application designed for managing digital temporary works inspections, deeply integrated with BIM data via Speckle. Its primary purpose is to track the reuse of temporary works materials (e.g., props, scaffolding, formwork) across multiple construction projects, promoting circular construction practices and providing full material lifecycle tracking. The system ensures that each physical element is "active and inspectable" in only one project at a time while maintaining a complete inspection history.
+
+The application features a Next.js frontend, an Express.js backend, a 3D viewer for BIM visualization, and PostgreSQL for data persistence. It supports secure user authentication via username/password (passport-local with scrypt password hashing) and facilitates multi-project workflows for comprehensive inspection, covering planning, scheduling, technical requirements, quality assurance, and commercial aspects.
+
+## Recent Updates (October 25, 2025)
+
+**v2.8.0 - Migration to Username/Password Authentication**
+- Replaced OAuth-based Replit Auth with direct username/password authentication
+- Authentication now works behind corporate firewalls (no external redirects)
+- Implemented secure password hashing using Node.js crypto scrypt algorithm
+- Created dedicated /auth page with login and signup forms
+- Added passport-local strategy for credential verification
+- Removed openid-client dependency for simpler architecture
+- Updated database schema to include password field
+- Maintained PostgreSQL session storage with 7-day session TTL
+- IMPORTANT: Existing users must re-register with new credentials
+
+**v2.7.0 - Production Deployment Optimization & Error Handling**
+- Fixed deployment health check failures by optimizing server startup sequence
+- Server now listens immediately and responds to health checks before Next.js initialization
+- Switched to esbuild for production server compilation (fast, reliable TypeScript bundling)
+- Build process: esbuild compiles server → Next.js builds frontend → production ready
+- Production runs compiled JavaScript instead of tsx (Node.js v20 compatible)
+- Deployment configuration uses `npm start` with compiled output
+- Fixed authentication strategy fallback for published domains
+- Health check endpoint responds in under 60ms for reliable deployments
+- Port configuration: Development uses 5000, Production defaults to 3000 (internal port forwarding to external 80)
+- Root path `/` responds with HTTP 200 during startup before Next.js is ready
+- Added comprehensive logging with timestamps to track health check requests and server timing
+- Health check endpoints log all requests and responses for deployment diagnostics
+- Root path handler logs whether Next.js is ready and how requests are handled
+- Server startup logs include timing metrics (Next.js preparation time, total startup time)
+- Authentication setup happens AFTER Next.js preparation to prevent blocking health checks
+- Added robust error handling: try-catch blocks on all route handlers to prevent crashes
+- Global uncaught exception and unhandled rejection handlers keep server running
+- Express global error handler catches any missed errors
+- All health check endpoints guaranteed to respond even if errors occur
+
+**v2.6.1 - Floating Panel for Asset Transfer**
+- Created floating, draggable panel for "Transfer Asset" (consistent with Registration and Linking UX)
+- Transfer workflow now appears as an elegant floating panel instead of blocking modal
+- Updated terminology throughout - now refers to "assets" instead of "elements" in transfer context
+- All three panels (Registration, Linking, Transfer) share consistent draggable behavior
+- Transfer button appears in Inspection Panel when element is linked to an asset
+- Streamlined cross-project material reuse workflow
+
+**v2.6.0 - Floating Panel for Asset Linking & Critical Bug Fixes**
+- Created floating, draggable panel for "Link Existing Asset" (matching Registration UX)
+- Fixed critical IFC Type bug - asset registration now correctly shows element type (IFCBEAM, IFCCOLUMN, etc.)
+- Root cause: missing selectedElementProperties/selectedElementType props in viewer page TopBar component
+- Asset linking now works in elegant floating panel instead of blocking modal overlay
+- Both Registration and Linking panels share consistent draggable behavior with viewport bounds clamping
+- User display name updates immediately in top-right corner after profile changes
+- Floating panels automatically stay visible when window is resized
+
+**v2.5.2 - Fixed IFC Type Extraction and Display Name Update**
+- Fixed IFC Type extraction for asset registration - now correctly generates asset numbers like IFCBEAM-000001, IFCCOLUMN-000002
+- Removed redundant property extraction logic - registration modal now uses same normalized properties as Element Details panel
+- Ensured consistent property access throughout the app (ViewerCore → InspectionPanel → ElementRegistrationModal)
+
+**v2.5.1 - PDF Export for Asset Information**
+- Added PDF export button to Asset Inventory actions column
+- Generates comprehensive PDF report with asset details, QR code, linked BIM elements, and inspection history
+- Professional formatting with automatic page breaks and branded footer
+- PDF filename auto-generated as TWX-Asset-[AssetNumber].pdf
+
+**v2.5.0 - Enhanced Asset Inventory with QR Codes, BIM Linkages, and Inspections**
+- Asset Inventory page now shows comprehensive asset details with expandable rows
+- QR codes displayed as scannable images for each physical asset
+- Shows all BIM elements from all projects linked to each asset
+- Displays complete inspection history for all linked BIM elements
+- New Details button expands to show QR code, linked elements, and inspections in three-column layout
+- Full material traceability across projects with visual inspection history
+- Responsive design adapts to mobile devices
+
+**v2.4.5 - Simplified Asset Registration Form**
+- Asset Number auto-generated as IFC-Type-XXXXXX (e.g., IfcColumn-000001)
+- IFC Type and Element Name automatically extracted from selected BIM element
+- Length auto-filled from element properties when available
+- Form reduced to just 5 fields: IFC Type (auto), Element Name (pre-filled), Length (auto), Current Condition (required dropdown), Remarks (optional)
+- Removed 9 unnecessary fields for cleaner, faster registration
+- New database field for optional remarks/notes
+
+**v2.4.4 - Streamlined Asset Registration Workflow**
+- Removed Asset Registration from hamburger menu for cleaner interface
+- Registration now exclusively via Inspection Panel's "Register New Asset" button
+- Registration form appears immediately in floating panel - single-click access
+- Selected element data automatically pre-filled in registration form
+- Enlarged floating panel (850px) to accommodate full form without scrolling
+- Context-aware workflow with BIM element already selected
+
+**v2.4.3 - Resizable Inspection Panel & Floating Asset Registration**
+- Restored inspection panel width adjustment with draggable resize handle
+- Panel defaults to 33% viewport width, persists custom width to localStorage
+- Created new floating Asset Registration modal
+- Modal appears centered and is draggable with position persistence
+
+**v2.4.2 - Simplified Hidden Elements Counter**
+- Removed verbose debug info box, replaced with compact "Hidden: X" badge
+- Positioned below Hide/Clear buttons in top-left corner
+- Only appears when elements are actually hidden
+
+**v2.4.1 - Unified Multi-Selection with Shift Key**
+- Multi-selection now uses Shift key only (aligned with Speckle's native behavior)
+- Visual highlighting and inspection panel perfectly synchronized
+
+**v2.4.0 - Streamlined Interface**
+- Removed Element Details section from Inspection Panel
+- Eliminated large orange selection indicator
+- Fixed Safari scrolling bug on documentation page
+
+See `data/changelog.json` for complete version history.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+The frontend is built with **Next.js 15** using a hybrid SSR/CSR approach, dynamically importing heavy components like the **Speckle Viewer** for BIM visualization. State management relies on native React hooks. Routing is file-based, with key routes for project viewing, asset inventory, and API endpoints.
+
+### Backend Architecture
+The backend utilizes **Express.js 5.x** integrated with Next.js, handling authentication and API routes. **Username/Password Authentication** is implemented using Passport.js with the passport-local strategy, using scrypt for secure password hashing. Session data is stored in PostgreSQL with a 7-day TTL. Data access is managed by **Drizzle ORM** with PostgreSQL, ensuring type-safe interactions. A critical feature is the **Material Reuse Tracking System**, which includes a global asset registry for physical temporary works elements, tracking their lifecycle across projects, and a dual-approval workflow for element transfers between projects.
+
+### Data Model
+The core data model includes:
+- **Users**: Stores user accounts with email, hashed password (scrypt), and profile information.
+- **Sessions**: PostgreSQL-backed session management with 7-day TTL.
+- **Projects**: Project metadata and Speckle URL references.
+- **Inspections**: Comprehensive, versioned inspection records with over 30 fields, linked to projects and specific elements. Includes `globalElementId` and `inspectionType` for material reuse.
+- **Elements**: A new global asset registry for physical temporary works, each with a unique ID, tracking type, manufacturer, specifications, condition, and status (e.g., active, in_storage). Supports QR code generation.
+- **Element Project History**: Tracks each element's journey across projects, including transfer dates, condition, and approvals, enabling full traceability.
+- **Element Speckle Mappings**: Links physical assets to their BIM representations in Speckle models.
+- **Changelog**: JSON-based record of application changes for "What's New" features.
+
+### API Design
+The system provides RESTful API endpoints for:
+- **Inspection Management**: CRUD operations for inspections and projects, and data export.
+- **Material Reuse Tracking**: Managing elements, including registration, lookup by QR code, transfer initiation/approval/reception, history tracking, and linking to Speckle BIM elements.
+- **Authentication & System**: User authentication status and application changelog retrieval.
+User context is leveraged for automatic tracking of who created or modified records.
+
+### Security
+Authentication is handled via username/password using Passport.js with the passport-local strategy. Passwords are securely hashed using Node.js crypto scrypt algorithm with random salts. Session management uses secure, HTTP-only cookies with a 7-day TTL, stored in PostgreSQL. Authorization is enforced via `isAuthenticated` middleware on sensitive routes, with user context available through `req.user`. Passwords are never sent to the client or logged.
+
+## External Dependencies
+
+### Third-Party Services
+- **Speckle**: BIM data platform for 3D model hosting and streaming.
+
+### Databases
+- **PostgreSQL**: Primary database for user management, session storage, projects, inspections, and element tracking, accessed via the `pg` driver.
+
+### Key NPM Packages
+- **next**: React framework.
+- **express**: Web server.
+- **drizzle-orm**: Database ORM for PostgreSQL.
+- **@speckle/viewer**: 3D visualization library.
+- **passport**, **passport-local**: Authentication middleware and local strategy.
+- **pg**: PostgreSQL driver.
+- **express-session**, **connect-pg-simple**: Session management and PostgreSQL store.
+- **qrcode**, **html5-qrcode**: QR code generation and scanning.
+
+### Environment Variables Required
+- `DATABASE_URL`
+- `SESSION_SECRET`
