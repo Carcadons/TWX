@@ -1,14 +1,158 @@
 import { useRouter } from "next/router";
 import Image from "next/image";
+import { useState, useEffect, useCallback } from "react";
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  speckleUrl?: string;
+  createdAt?: string;
+  lastModified?: string;
+}
 
 export default function Home() {
   const router = useRouter();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<{id: string, name: string} | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectUrl, setNewProjectUrl] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const projects = [
-    { id: "123", name: "Project 123", status: "active" },
-    { id: "124", name: "Building Complex A", status: "active" },
-    { id: "125", name: "Infrastructure Project", status: "pending" },
-  ];
+  // Load projects from API
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/projects');
+      const result = await response.json();
+
+      if (result.success) {
+        setProjects(result.data);
+        setError(null);
+      } else {
+        setError(result.error || 'Failed to load projects');
+      }
+    } catch (err) {
+      console.error('Failed to load projects:', err);
+      setError('Failed to connect to server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load projects on component mount
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  // Clear error when user starts typing
+  useEffect(() => {
+    if (error && (newProjectName || newProjectUrl)) {
+      setError(null);
+    }
+  }, [newProjectName, newProjectUrl, error]);
+
+  // Create a memoized handler for project navigation
+  const handleProjectClick = useCallback((projectId: string) => {
+    console.log('Navigating to project ID:', projectId);
+    router.push(`/viewer/${projectId}`);
+  }, [router]);
+
+  // Create a memoized handler for delete modal
+  const handleDeleteClick = useCallback((project: {id: string, name: string}) => {
+    console.log('Opening delete modal for project:', project);
+    setProjectToDelete(project);
+    setDeleteModalOpen(true);
+    setDeleteConfirmText("");
+  }, []);
+
+  // Create new project function
+  const createProject = async () => {
+    if (!newProjectName.trim()) {
+      setError('Project name is required');
+      return;
+    }
+
+    if (!newProjectUrl.trim()) {
+      setError('Speckle project URL is required');
+      return;
+    }
+
+    if (!newProjectUrl.includes('speckle.systems/projects/')) {
+      setError('Please enter a valid Speckle project URL (e.g., https://app.speckle.systems/projects/...)');
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      setError(null);
+
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newProjectName.trim(),
+          speckleUrl: newProjectUrl.trim(),
+          status: 'active'
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setProjects(prevProjects => [...prevProjects, result.data]);
+        setNewProjectName("");
+        setNewProjectUrl("");
+        console.log('✅ New project created:', result.data);
+        router.push(`/viewer/${result.data.id}`);
+      } else {
+        setError(result.error || 'Failed to create project');
+      }
+    } catch (err) {
+      console.error('❌ Failed to create project:', err);
+      setError('Failed to connect to server');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setProjectToDelete(null);
+    setDeleteConfirmText("");
+  };
+
+  const handleDeleteProject = async () => {
+    if (deleteConfirmText === "DELETE" && projectToDelete) {
+      try {
+        const response = await fetch(`/api/projects?id=${projectToDelete.id}`, {
+          method: 'DELETE',
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setProjects(prevProjects => 
+            prevProjects.filter(project => project.id !== projectToDelete.id)
+          );
+          console.log(`Deleted project ${projectToDelete.id}: ${projectToDelete.name}`);
+          closeDeleteModal();
+        } else {
+          console.error('Failed to delete project:', result.error);
+          setError(result.error || 'Failed to delete project');
+        }
+      } catch (err) {
+        console.error('Failed to delete project:', err);
+        setError('Failed to connect to server');
+      }
+    }
+  };
 
   return (
     <div className="home-container">
@@ -16,11 +160,10 @@ export default function Home() {
         {/* Header */}
         <div className="home-header">
           <div className="logo-section">
-            <Image src="/logo-orange.png" alt="TWX" width={80} height={80} />
-            <h1 className="app-title">TWX</h1>
+            <Image src="/logo-orange.png" alt="TWX" width={160} height={160} />
           </div>
           <p className="app-description">
-            Temporary Works Inspection for BIM Elements
+            Digital Temporary Works Inspection
           </p>
         </div>
 
@@ -28,23 +171,60 @@ export default function Home() {
         <div className="project-section">
           <h2 className="section-title">Select a project</h2>
 
-          <div className="project-list">
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                onClick={() => router.push(`/viewer/${project.id}`)}
-                className="project-item"
-              >
-                <div className="project-info">
-                  <span className="project-name">{project.name}</span>
-                  <span className={`project-status ${project.status}`}>
-                    {project.status}
-                  </span>
-                </div>
-                <div className="project-arrow">→</div>
+          {error && (
+            <div className="error-message">
+              <p>⚠️ {error}</p>
+              <button onClick={loadProjects} className="btn btn-sm btn-secondary">
+                Retry
               </button>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading projects...</p>
+            </div>
+          ) : (
+            <div className="project-list">
+              {projects.map((project) => (
+                <div key={`project-${project.id}`} className="project-item-wrapper">
+                  <button
+                    onClick={() => handleProjectClick(project.id)}
+                    className="project-item"
+                    data-project-id={project.id}
+                  >
+                    <div className="project-info">
+                      <span className="project-name">{project.name}</span>
+                      <span className={`project-status ${project.status}`}>
+                        {project.status}
+                      </span>
+                    </div>
+                    <div className="project-arrow">→</div>
+                  </button>
+
+                  <div className="project-actions">
+                    <button
+                      onClick={() => handleDeleteClick({id: project.id, name: project.name})}
+                      className="delete-button"
+                      title="Delete project"
+                      data-project-id={project.id}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14ZM10 11v6M14 11v6"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!loading && projects.length === 0 && (
+                <div className="empty-state">
+                  <p>No projects found. Create your first project below!</p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* New Project Section */}
           <div className="new-project-section">
@@ -52,12 +232,21 @@ export default function Home() {
 
             <div className="project-setup">
               <div className="setup-form">
+                {error && (
+                  <div className="form-error">
+                    <p>⚠️ {error}</p>
+                  </div>
+                )}
+
                 <div className="input-group">
                   <label className="input-label">Speckle Project URL</label>
                   <input
                     type="text"
                     placeholder="https://app.speckle.systems/projects/..."
-                    className="speckle-input"
+                    className={`speckle-input ${error && !newProjectUrl.trim() ? 'input-error' : ''}`}
+                    value={newProjectUrl}
+                    onChange={(e) => setNewProjectUrl(e.target.value)}
+                    disabled={isCreating}
                   />
                 </div>
 
@@ -66,15 +255,26 @@ export default function Home() {
                   <input
                     type="text"
                     placeholder="Enter project name"
-                    className="project-input"
+                    className={`project-input ${error && !newProjectName.trim() ? 'input-error' : ''}`}
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    disabled={isCreating}
                   />
                 </div>
 
                 <button 
                   className="btn btn-primary setup-button"
-                  onClick={() => {/* Handle project setup */}}
+                  onClick={createProject}
+                  disabled={isCreating || !newProjectName.trim() || !newProjectUrl.trim()}
                 >
-                  Setup Project
+                  {isCreating ? (
+                    <>
+                      <div className="button-spinner"></div>
+                      Creating Project...
+                    </>
+                  ) : (
+                    'Setup Project'
+                  )}
                 </button>
               </div>
 
@@ -91,20 +291,82 @@ export default function Home() {
         </div>
       </div>
 
+      {deleteModalOpen && projectToDelete && (
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Delete Project</h3>
+              <button onClick={closeDeleteModal} className="modal-close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="warning-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+
+              <p className="warning-text">
+                Are you sure you want to delete <strong>"{projectToDelete.name}"</strong>?
+              </p>
+
+              <p className="warning-subtext">
+                This action cannot be undone. All inspection data and project settings will be permanently deleted.
+              </p>
+
+              <div className="confirmation-input">
+                <label htmlFor="delete-confirm">
+                  Type <strong>DELETE</strong> to confirm:
+                </label>
+                <input
+                  id="delete-confirm"
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE here"
+                  className="delete-input"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={closeDeleteModal} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button 
+                onClick={handleDeleteProject}
+                disabled={deleteConfirmText !== "DELETE"}
+                className="btn btn-error"
+              >
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .home-container {
+          width: 100%;
           min-height: 100vh;
           background: var(--color-dark);
           color: var(--color-white);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: var(--space-xl);
+          padding: var(--space-2xl) var(--space-xl);
+          box-sizing: border-box;
         }
 
         .home-content {
           width: 100%;
-          max-width: 480px;
+          max-width: 520px;
+          margin: 0 auto;
           display: flex;
           flex-direction: column;
           gap: var(--space-2xl);
@@ -123,18 +385,12 @@ export default function Home() {
           margin-bottom: var(--space-lg);
         }
 
-        .app-title {
-          font-size: var(--font-size-3xl);
-          font-weight: 700;
-          color: var(--color-white);
-          margin: 0;
-        }
-
         .app-description {
           font-size: var(--font-size-lg);
           color: var(--color-gray-400);
           margin: 0;
           line-height: 1.6;
+          font-weight: 500;
         }
 
         .project-section {
@@ -156,6 +412,13 @@ export default function Home() {
           gap: var(--space-sm);
         }
 
+        .project-item-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+          gap: var(--space-sm);
+        }
+
         .project-item {
           display: flex;
           align-items: center;
@@ -167,10 +430,10 @@ export default function Home() {
           cursor: pointer;
           transition: all 0.15s ease;
           text-align: left;
-          width: 100%;
+          flex: 1;
         }
 
-        .project-item:hover {
+        .project-item:hover:not(:disabled) {
           background: var(--color-gray-700);
           border-color: var(--color-gray-600);
         }
@@ -179,6 +442,7 @@ export default function Home() {
           display: flex;
           flex-direction: column;
           gap: var(--space-xs);
+          flex: 1;
         }
 
         .project-name {
@@ -217,6 +481,80 @@ export default function Home() {
           color: var(--color-gray-400);
         }
 
+        .project-actions {
+          display: flex;
+          align-items: center;
+          gap: var(--space-sm);
+          min-height: 32px;
+        }
+
+        .delete-button {
+          padding: var(--space-sm);
+          background: transparent;
+          border: none;
+          color: var(--color-gray-500);
+          cursor: pointer;
+          border-radius: var(--border-radius);
+          transition: all 0.15s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .delete-button:hover {
+          background: var(--color-error);
+          color: var(--color-white);
+        }
+
+        .loading-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: var(--space-md);
+          padding: var(--space-2xl);
+          color: var(--color-gray-400);
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid var(--color-gray-700);
+          border-top: 3px solid var(--color-primary);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        .error-message {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: var(--space-md);
+          padding: var(--space-lg);
+          background: var(--color-gray-800);
+          border: var(--border-width) solid var(--color-error);
+          border-radius: var(--border-radius-lg);
+          margin-bottom: var(--space-lg);
+        }
+
+        .error-message p {
+          color: var(--color-error);
+          margin: 0;
+          text-align: center;
+        }
+
+        .empty-state {
+          text-align: center;
+          padding: var(--space-2xl);
+          color: var(--color-gray-500);
+          background: var(--color-gray-800);
+          border: 2px dashed var(--color-gray-700);
+          border-radius: var(--border-radius-lg);
+        }
+
+        .empty-state p {
+          margin: 0;
+        }
+
         .new-project-section {
           margin-top: var(--space-xl);
           padding-top: var(--space-xl);
@@ -244,6 +582,21 @@ export default function Home() {
           display: flex;
           flex-direction: column;
           gap: var(--space-lg);
+        }
+
+        .form-error {
+          padding: var(--space-md);
+          background: var(--color-gray-700);
+          border: var(--border-width) solid var(--color-error);
+          border-radius: var(--border-radius);
+          margin-bottom: var(--space-md);
+        }
+
+        .form-error p {
+          color: var(--color-error);
+          margin: 0;
+          font-size: var(--font-size-sm);
+          text-align: center;
         }
 
         .input-group {
@@ -275,6 +628,20 @@ export default function Home() {
           border-color: var(--color-primary);
         }
 
+        .speckle-input:disabled,
+        .project-input:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .input-error {
+          border-color: var(--color-error) !important;
+        }
+
+        .input-error:focus {
+          border-color: var(--color-error) !important;
+        }
+
         .speckle-input::placeholder,
         .project-input::placeholder {
           color: var(--color-gray-400);
@@ -284,6 +651,18 @@ export default function Home() {
           width: 100%;
           justify-content: center;
           padding: var(--space-lg);
+          display: flex;
+          align-items: center;
+          gap: var(--space-sm);
+        }
+
+        .button-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top: 2px solid white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
         }
 
         .setup-info {
@@ -324,11 +703,136 @@ export default function Home() {
           border-radius: 50%;
         }
 
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.75);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          padding: var(--space-lg);
+        }
+
+        .modal-content {
+          background: var(--color-white);
+          border-radius: var(--border-radius-lg);
+          box-shadow: var(--shadow-lg);
+          max-width: 480px;
+          width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: var(--space-lg);
+          border-bottom: var(--border-width) solid var(--color-gray-200);
+        }
+
+        .modal-header h3 {
+          margin: 0;
+          font-size: var(--font-size-lg);
+          font-weight: 600;
+          color: var(--color-gray-900);
+        }
+
+        .modal-close {
+          background: none;
+          border: none;
+          color: var(--color-gray-500);
+          cursor: pointer;
+          padding: var(--space-xs);
+          border-radius: var(--border-radius);
+          transition: all 0.15s ease;
+        }
+
+        .modal-close:hover {
+          background: var(--color-gray-100);
+          color: var(--color-gray-700);
+        }
+
+        .modal-body {
+          padding: var(--space-lg);
+          text-align: center;
+        }
+
+        .warning-icon {
+          color: var(--color-warning);
+          margin-bottom: var(--space-lg);
+        }
+
+        .warning-text {
+          font-size: var(--font-size-base);
+          color: var(--color-gray-900);
+          margin-bottom: var(--space-md);
+          line-height: 1.5;
+        }
+
+        .warning-subtext {
+          font-size: var(--font-size-sm);
+          color: var(--color-gray-600);
+          margin-bottom: var(--space-xl);
+          line-height: 1.5;
+        }
+
+        .confirmation-input {
+          text-align: left;
+          margin-bottom: var(--space-lg);
+        }
+
+        .confirmation-input label {
+          display: block;
+          font-size: var(--font-size-sm);
+          font-weight: 500;
+          color: var(--color-gray-700);
+          margin-bottom: var(--space-sm);
+        }
+
+        .delete-input {
+          width: 100%;
+          padding: var(--space-md);
+          border: 2px solid var(--color-gray-300);
+          border-radius: var(--border-radius);
+          font-size: var(--font-size-base);
+          background: var(--color-white);
+          color: var(--color-gray-900);
+          transition: border-color 0.15s ease;
+        }
+
+        .delete-input:focus {
+          outline: none;
+          border-color: var(--color-error);
+        }
+
+        .delete-input::placeholder {
+          color: var(--color-gray-400);
+        }
+
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: var(--space-sm);
+          padding: var(--space-lg);
+          border-top: var(--border-width) solid var(--color-gray-200);
+          background: var(--color-gray-50);
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
         /* Mobile Styles */
         @media (max-width: 768px) {
           .home-container {
             padding: var(--space-md);
-            align-items: flex-start;
             padding-top: var(--space-2xl);
           }
 
@@ -337,20 +841,31 @@ export default function Home() {
             gap: var(--space-xl);
           }
 
-          .app-title {
-            font-size: var(--font-size-2xl);
-          }
-
-          .app-description {
-            font-size: var(--font-size-base);
-          }
-
           .section-title {
             font-size: var(--font-size-xl);
           }
 
           .project-item {
             padding: var(--space-md);
+          }
+
+          .project-item-wrapper {
+            flex-direction: column;
+            align-items: stretch;
+            gap: var(--space-xs);
+          }
+
+          .project-actions {
+            justify-content: flex-end;
+            padding: 0 var(--space-sm);
+          }
+
+          .modal-overlay {
+            padding: var(--space-md);
+          }
+
+          .modal-content {
+            max-height: 95vh;
           }
 
           .project-setup {
