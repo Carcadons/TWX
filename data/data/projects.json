@@ -1,0 +1,41 @@
+{
+  "projects": [
+    {
+      "id": "123",
+      "name": "Testing Structure",
+      "status": "active",
+      "speckleUrl": "https://app.speckle.systems/projects/6db9f977d5/models/ccbcddb5c0",
+      "createdAt": "2025-05-15T10:30:00Z",
+      "lastModified": "2025-06-09T14:22:00Z"
+    },
+    {
+      "id": "proj_1749563662610_i6qqihs40",
+      "name": "Reo Model",
+      "status": "active",
+      "speckleUrl": "https://app.speckle.systems/projects/6db9f977d5/models/e99c449924",
+      "createdAt": "2025-06-10T13:54:22.610Z",
+      "lastModified": "2025-06-10T13:54:22.610Z"
+    },
+    {
+      "id": "proj_1749565853969_lrxctrqki",
+      "name": "T2 Deck",
+      "status": "active",
+      "speckleUrl": "https://app.speckle.systems/projects/6db9f977d5/models/81e326db3d",
+      "createdAt": "2025-06-10T14:30:53.969Z",
+      "lastModified": "2025-06-10T14:30:53.969Z"
+    },
+    {
+      "id": "proj_1749809348123_ibeog82ge",
+      "name": "NDH ELS",
+      "status": "active",
+      "speckleUrl": "https://app.speckle.systems/projects/6db9f977d5/models/b00c3195f6",
+      "createdAt": "2025-06-13T10:09:08.123Z",
+      "lastModified": "2025-06-13T10:09:08.123Z"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdate": "2025-06-13T10:09:08.123Z",
+    "totalProjects": 4
+  }
+}
