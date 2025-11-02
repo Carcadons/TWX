@@ -1,7 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import TopBar from "../../components/TopBar";
+
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  speckleUrl?: string;
+  createdAt?: string;
+  lastModified?: string;
+}
 
 const ViewerWrapper = dynamic(() => import("../../app/viewer/ViewerWrapper"), { 
   ssr: false,
@@ -17,15 +27,54 @@ const ViewerWrapper = dynamic(() => import("../../app/viewer/ViewerWrapper"), {
 
 export default function ProjectPage() {
   const [isClient, setIsClient] = useState(false);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { project: projectId } = router.query;
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  if (!isClient) {
+  // Load project data
+  const loadProject = async (id: string) => {
+    try {
+      console.log(`🔄 Loading project data for page: ${id}`);
+
+      const response = await fetch(`/api/projects?id=${id}`);
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setCurrentProject(result.data);
+        console.log(`✅ Loaded project for page:`, result.data);
+        return result.data;
+      } else {
+        throw new Error(result.error || 'Project not found');
+      }
+    } catch (error) {
+      console.error(`❌ Failed to load project ${id}:`, error);
+      setCurrentProject(null);
+      // Optionally redirect to home page on error
+      // router.push('/');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load project when projectId changes
+  useEffect(() => {
+    if (router.isReady && projectId && typeof projectId === 'string') {
+      loadProject(projectId);
+    } else if (router.isReady && !projectId) {
+      setCurrentProject(null);
+      setLoading(false);
+    }
+  }, [router.isReady, projectId]);
+
+  if (!isClient || !router.isReady || loading) {
     return (
       <div className="page-container">
-        <TopBar />
+        <TopBar currentProject={currentProject} />
         <main className="page-main">
           <div className="loading-container">
             <div className="loading-content">
@@ -92,7 +141,7 @@ export default function ProjectPage() {
 
   return (
     <div className="page-container">
-      <TopBar />
+      <TopBar currentProject={currentProject} />
       <main className="page-main">
         <ViewerWrapper />
       </main>

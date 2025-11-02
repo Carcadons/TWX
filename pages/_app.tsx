@@ -1,6 +1,12 @@
 import type { AppProps } from "next/app";
+import { useRouter } from "next/router";
 
 export default function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+
+  // Check if we're on the home page
+  const isHomePage = router.pathname === '/';
+
   return (
     <>
       {/* Inject global CSS variables and design system */}
@@ -129,11 +135,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
           outline-offset: 2px;
         }
 
-        /* Next.js app wrapper */
+        /* Next.js app wrapper - conditional overflow */
         #__next {
           height: 100vh;
           width: 100vw;
-          overflow: hidden;
+          /* Allow scrolling on home page, prevent on viewer pages */
+          overflow: ${isHomePage ? 'auto' : 'hidden'};
         }
 
         /* Component Base Classes */

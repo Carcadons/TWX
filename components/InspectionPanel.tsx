@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { twxApi, useTWXApi } from "../lib/api";
 
 interface SelectedElement {
   id: string;
@@ -10,6 +11,7 @@ interface SelectedElement {
 
 interface InspectionPanelProps {
   selectedElement: SelectedElement | null;
+  projectId: string;
   onInspectionChange: () => void;
 }
 
@@ -18,10 +20,12 @@ interface InspectionData {
   status: string;
   notes: string;
   date: string;
-  timestamp: string;
+  timestamp?: string;
 }
 
-export default function InspectionPanel({ selectedElement, onInspectionChange }: InspectionPanelProps) {
+export default function InspectionPanel({ selectedElement, projectId, onInspectionChange }: InspectionPanelProps) {
+  const { api, isOnline, currentProject } = useTWXApi();
+
   const [formData, setFormData] = useState<InspectionData>({
     inspector: "",
     status: "",
@@ -30,10 +34,21 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
     timestamp: ""
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [panelWidth, setPanelWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
+
   const panelRef = useRef<HTMLDivElement>(null);
-  const resizeRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Set the project ID on the API service when projectId prop changes
+  useEffect(() => {
+    if (projectId && projectId !== currentProject) {
+      console.log(`🆔 InspectionPanel: Setting project ID to ${projectId}`);
+      api.setProject(projectId);
+    }
+  }, [projectId, currentProject, api]);
 
   // Handle panel resizing
   useEffect(() => {
@@ -72,27 +87,45 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
     setIsResizing(true);
   };
 
-  // Debug: Log props received
-  useEffect(() => {
-    console.log("🔍 InspectionPanel props:", { selectedElement, onInspectionChange });
-  }, [selectedElement, onInspectionChange]);
-
   // Load inspection data when element changes
   useEffect(() => {
     console.log("🔍 InspectionPanel selectedElement changed:", selectedElement);
 
     if (selectedElement) {
-      const stored = localStorage.getItem(`inspection-${selectedElement.id}`);
-      if (stored) {
-        try {
-          const parsedData = JSON.parse(stored);
-          console.log("🔍 Loaded stored inspection data:", parsedData);
-          setFormData(parsedData);
-        } catch (e) {
-          console.warn("Failed to parse stored inspection data:", e);
-        }
+      loadInspectionData(selectedElement.id);
+    } else {
+      setFormData({
+        inspector: "",
+        status: "",
+        notes: "",
+        date: new Date().toISOString().split('T')[0],
+        timestamp: ""
+      });
+    }
+  }, [selectedElement]);
+
+  // Load inspection data from API
+  const loadInspectionData = async (elementId: string) => {
+    if (!elementId || !projectId) return;
+
+    setIsLoading(true);
+    setSaveStatus('idle');
+
+    try {
+      console.log(`🔍 Loading inspection for element ${elementId} in project ${projectId}`);
+      const inspection = await api.getInspectionByElement(elementId, projectId);
+
+      if (inspection) {
+        console.log("🔍 Loaded inspection data from API:", inspection);
+        setFormData({
+          inspector: inspection.inspector || "",
+          status: inspection.status || "",
+          notes: inspection.notes || "",
+          date: inspection.date || new Date().toISOString().split('T')[0],
+          timestamp: inspection.timestamp || ""
+        });
       } else {
-        console.log("🔍 No stored data, using defaults");
+        console.log("🔍 No inspection data found, using defaults");
         setFormData({
           inspector: "",
           status: "",
@@ -101,30 +134,76 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           timestamp: ""
         });
       }
+    } catch (error) {
+      console.error("❌ Failed to load inspection data:", error);
+      setSaveStatus('error');
+
+      setFormData({
+        inspector: "",
+        status: "",
+        notes: "",
+        date: new Date().toISOString().split('T')[0],
+        timestamp: ""
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [selectedElement]);
-
-  // Save inspection data
-  const saveInspection = (data: InspectionData) => {
-    if (!selectedElement) return;
-
-    const inspectionData = {
-      ...data,
-      timestamp: new Date().toISOString()
-    };
-
-    console.log("💾 Saving inspection data:", inspectionData);
-
-    localStorage.setItem(`inspection-${selectedElement.id}`, JSON.stringify(inspectionData));
-
-    const allInspections = JSON.parse(localStorage.getItem('all-inspections') || '{}');
-    allInspections[selectedElement.id] = inspectionData;
-    localStorage.setItem('all-inspections', JSON.stringify(allInspections));
-
-    console.log("💾 Calling onInspectionChange");
-    onInspectionChange();
   };
 
+  // Save inspection data with debouncing
+  const saveInspection = async (data: InspectionData, skipDebounce = false) => {
+    if (!selectedElement || !projectId) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    const performSave = async () => {
+      setSaveStatus('saving');
+
+      try {
+        if (isOnline) {
+          console.log(`💾 Saving inspection for element ${selectedElement.id} in project ${projectId}`);
+
+          const saved = await api.saveInspection({
+            elementId: selectedElement.id,
+            projectId: projectId, // Explicitly set project ID
+            inspector: data.inspector,
+            status: data.status as 'ok' | 'issue' | '',
+            notes: data.notes,
+            date: data.date,
+            lastModifiedBy: 'user'
+          }, projectId);
+
+          if (saved) {
+            console.log("💾 Saved inspection to API:", saved);
+            setSaveStatus('saved');
+            onInspectionChange();
+          } else {
+            throw new Error('API save failed');
+          }
+        } else {
+          console.log("❌ Cannot save - API is offline");
+          setSaveStatus('error');
+        }
+
+        setTimeout(() => setSaveStatus('idle'), 2000);
+
+      } catch (error) {
+        console.error("❌ Failed to save inspection:", error);
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      }
+    };
+
+    if (skipDebounce) {
+      await performSave();
+    } else {
+      saveTimeoutRef.current = setTimeout(performSave, 1000);
+    }
+  };
+
+  // Update form field
   const updateField = (field: keyof InspectionData, value: string) => {
     const newData = { ...formData, [field]: value };
     console.log("📝 Updating field:", field, "to:", value);
@@ -135,8 +214,9 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
     }
   };
 
-  const clearInspection = () => {
-    if (!selectedElement) return;
+  // Clear inspection
+  const clearInspection = async () => {
+    if (!selectedElement || !projectId) return;
 
     const clearedData = {
       inspector: "",
@@ -147,41 +227,82 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
     };
 
     setFormData(clearedData);
-    localStorage.removeItem(`inspection-${selectedElement.id}`);
 
-    const allInspections = JSON.parse(localStorage.getItem('all-inspections') || '{}');
-    delete allInspections[selectedElement.id];
-    localStorage.setItem('all-inspections', JSON.stringify(allInspections));
+    try {
+      if (isOnline) {
+        console.log(`🗑️ Clearing inspection for element ${selectedElement.id} in project ${projectId}`);
+        const existing = await api.getInspectionByElement(selectedElement.id, projectId);
+        if (existing?.id) {
+          await api.deleteInspection(existing.id);
+        }
+      } else {
+        console.log("❌ Cannot clear - API is offline");
+      }
 
-    onInspectionChange();
+      onInspectionChange();
+      console.log("🗑️ Cleared inspection for element:", selectedElement.id);
+    } catch (error) {
+      console.error("❌ Failed to clear inspection:", error);
+    }
   };
 
-  const exportAllData = () => {
-    const allInspections = JSON.parse(localStorage.getItem('all-inspections') || '{}');
+  // Export all data
+  const exportAllData = async () => {
+    if (!projectId) {
+      console.error("❌ Cannot export - no project ID");
+      return;
+    }
 
-    const exportData = {
-      projectName: "TWX Inspection Project",
-      exportDate: new Date().toISOString(),
-      totalInspections: Object.keys(allInspections).length,
-      inspections: allInspections
-    };
+    try {
+      console.log(`📁 Exporting data for project: ${projectId}`);
+      const exportData = await api.exportData(projectId);
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `twx-inspections-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      if (exportData) {
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `twx-inspections-${projectId}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        console.log("📁 Exported data:", exportData);
+      } else {
+        throw new Error('No data to export from API');
+      }
+    } catch (error) {
+      console.error("❌ Export failed:", error);
+      alert("Export failed - make sure the API is online and contains data");
+    }
   };
 
+  // Status color helper
   const getStatusColor = (status: string) => {
     switch (status) {
       case "ok": return "var(--color-success)";
       case "issue": return "var(--color-error)";
       default: return "var(--color-gray-400)";
+    }
+  };
+
+  // Save status indicator
+  const getSaveStatusText = () => {
+    switch (saveStatus) {
+      case 'saving': return `Saving to project ${projectId}...`;
+      case 'saved': return `Saved to project ${projectId}`;
+      case 'error': return 'Save failed - API offline';
+      default: return isOnline ? `Auto-save to project ${projectId}` : 'API offline - cannot save';
+    }
+  };
+
+  const getSaveStatusColor = () => {
+    switch (saveStatus) {
+      case 'saving': return 'var(--color-warning)';
+      case 'saved': return 'var(--color-success)';
+      case 'error': return 'var(--color-error)';
+      default: return 'var(--color-gray-500)';
     }
   };
 
@@ -193,17 +314,31 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
     >
       {/* Custom Resize Handle */}
       <div
-        ref={resizeRef}
         className="resize-handle"
         onMouseDown={handleResizeStart}
       />
 
       {/* Header */}
       <div className="panel-header">
-        <h2>BIM Inspection</h2>
-        <button onClick={exportAllData} className="btn btn-sm btn-secondary">
-          Export
-        </button>
+        <div className="header-left">
+          <h2>BIM Inspection</h2>
+          <div className="connection-status">
+            <div 
+              className={`status-dot ${isOnline ? 'online' : 'offline'}`}
+            />
+            <span className="status-text">
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+            {projectId && (
+              <span className="project-id">• {projectId}</span>
+            )}
+          </div>
+        </div>
+        <div className="header-actions">
+          <button onClick={exportAllData} className="btn btn-sm btn-secondary">
+            Export
+          </button>
+        </div>
       </div>
 
       {selectedElement ? (
@@ -212,6 +347,9 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           <div className="card">
             <div className="card-header">
               <h3>Element Details</h3>
+              {isLoading && (
+                <div className="loading-spinner-small"></div>
+              )}
             </div>
             <div className="card-body">
               <div className="element-name">{selectedElement.name}</div>
@@ -265,6 +403,7 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
                     onChange={(e) => updateField('inspector', e.target.value)}
                     placeholder="Enter inspector name"
                     className="form-input"
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -276,6 +415,7 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
                       value={formData.status}
                       onChange={(e) => updateField('status', e.target.value)}
                       className={`form-select status-select ${formData.status ? `status-${formData.status}` : ''}`}
+                      disabled={isLoading}
                     >
                       <option value="">Select Status</option>
                       <option value="ok">✓ Passed</option>
@@ -292,10 +432,11 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
                     value={formData.date}
                     onChange={(e) => updateField('date', e.target.value)}
                     className="form-input"
+                    disabled={isLoading}
                   />
                 </div>
 
-                {/* Notes Field - Full Width */}
+                {/* Notes Field */}
                 <div className="form-group form-group-full">
                   <label className="form-label">Notes</label>
                   <textarea
@@ -304,6 +445,7 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
                     placeholder="Add inspection notes..."
                     rows={3}
                     className="form-textarea"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -322,10 +464,13 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
               )}
             </div>
 
-            {/* Auto-save note */}
+            {/* Auto-save status */}
             <div className="card-footer">
-              <div className="auto-save-note">
-                Auto-saved locally
+              <div 
+                className="auto-save-note"
+                style={{ color: getSaveStatusColor() }}
+              >
+                {getSaveStatusText()}
               </div>
             </div>
           </div>
@@ -347,9 +492,12 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
             </p>
 
             <div className="feature-list">
+              <div className="feature-item">
+                {isOnline ? `🟢 Connected to project ${projectId}` : '🔴 Database offline'}
+              </div>
               <div className="feature-item">Click elements to see BIM properties</div>
               <div className="feature-item">Add inspection notes and status</div>
-              <div className="feature-item">Visual color coding</div>
+              <div className="feature-item">Visual color coding from database</div>
               <div className="feature-item">Export inspection data</div>
             </div>
           </div>
@@ -369,7 +517,6 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           position: relative;
         }
 
-        /* Custom JavaScript-based resize handle */
         .resize-handle {
           position: absolute;
           left: -3px;
@@ -388,7 +535,6 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           width: 8px;
         }
 
-        /* Resize indicator dots */
         .resize-handle::after {
           content: '⋮⋮';
           position: absolute;
@@ -407,11 +553,6 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           color: var(--color-primary);
         }
 
-        /* Hide any browser default resize handles */
-        .inspection-panel::-webkit-resizer {
-          display: none;
-        }
-
         .panel-header {
           display: flex;
           justify-content: space-between;
@@ -421,11 +562,54 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           background: var(--color-gray-50);
         }
 
+        .header-left {
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-xs);
+        }
+
         .panel-header h2 {
           font-size: var(--font-size-lg);
           font-weight: 600;
           color: var(--color-gray-900);
           margin: 0;
+        }
+
+        .connection-status {
+          display: flex;
+          align-items: center;
+          gap: var(--space-xs);
+        }
+
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          transition: background-color 0.2s ease;
+        }
+
+        .status-dot.online {
+          background: var(--color-success);
+        }
+
+        .status-dot.offline {
+          background: var(--color-error);
+        }
+
+        .status-text {
+          font-size: var(--font-size-xs);
+          color: var(--color-gray-600);
+        }
+
+        .project-id {
+          font-size: var(--font-size-xs);
+          color: var(--color-gray-500);
+          font-family: monospace;
+        }
+
+        .header-actions {
+          display: flex;
+          gap: var(--space-sm);
         }
 
         .panel-content {
@@ -436,7 +620,7 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           gap: var(--space-md);
           overflow-y: auto;
           overflow-x: hidden;
-          height: 0; /* Forces flex child to respect scroll */
+          height: 0;
         }
 
         .card {
@@ -444,7 +628,7 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           border-radius: var(--border-radius);
           border: var(--border-width) solid var(--color-gray-200);
           box-shadow: var(--shadow-sm);
-          flex-shrink: 0; /* Prevent cards from shrinking */
+          flex-shrink: 0;
         }
 
         .card-header {
@@ -470,6 +654,15 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           font-weight: 600;
           color: var(--color-gray-900);
           margin: 0;
+        }
+
+        .loading-spinner-small {
+          width: 16px;
+          height: 16px;
+          border: 2px solid var(--color-gray-200);
+          border-top: 2px solid var(--color-primary);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
         }
 
         .element-name {
@@ -527,7 +720,6 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           font-size: var(--font-size-xs);
         }
 
-        /* IMPROVED FORM STYLING - More Compact */
         .form-container {
           display: flex;
           flex-direction: column;
@@ -572,13 +764,18 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.1);
         }
 
+        .form-input:disabled,
+        .form-textarea:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .form-textarea {
           resize: vertical;
           min-height: 60px;
           line-height: 1.4;
         }
 
-        /* STATUS SELECT IMPROVEMENTS */
         .status-select-wrapper {
           position: relative;
           width: 100%;
@@ -609,6 +806,11 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
           box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.1);
         }
 
+        .status-select:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
         .status-select.status-ok {
           border-color: var(--color-success);
           background-color: #f0fdf4;
@@ -617,14 +819,6 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
         .status-select.status-issue {
           border-color: var(--color-error);
           background-color: #fef2f2;
-        }
-
-        .status-select option {
-          padding: var(--space-xs);
-          font-size: var(--font-size-sm);
-          background: var(--color-white);
-          color: var(--color-gray-900);
-          line-height: 1.3;
         }
 
         .status-preview {
@@ -649,9 +843,9 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
 
         .auto-save-note {
           font-size: var(--font-size-xs);
-          color: var(--color-gray-500);
           text-align: center;
           line-height: 1.2;
+          transition: color 0.2s ease;
         }
 
         .welcome-state {
@@ -719,6 +913,21 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
             display: none;
           }
 
+          .panel-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--space-sm);
+          }
+
+          .header-left {
+            width: 100%;
+          }
+
+          .header-actions {
+            width: 100%;
+            justify-content: flex-end;
+          }
+
           .form-container {
             gap: var(--space-sm);
           }
@@ -754,6 +963,11 @@ export default function InspectionPanel({ selectedElement, onInspectionChange }:
 
         .panel-content::-webkit-scrollbar-thumb:hover {
           background: var(--color-gray-500);
+        }
+
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
