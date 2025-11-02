@@ -1,0 +1,446 @@
+{
+  "changes": [
+    {
+      "id": "change_20251025_001",
+      "version": "2.8.0",
+      "date": "2025-10-25",
+      "title": "Migration to Username/Password Authentication",
+      "category": "feature",
+      "description": "Replaced OAuth-based Replit Auth with direct username/password authentication to enable access behind corporate firewalls",
+      "details": [
+        "Removed dependency on external OAuth providers (Replit, Google, GitHub) for better firewall compatibility",
+        "Implemented secure password-based authentication using scrypt hashing algorithm",
+        "Created dedicated login/signup page with email and password forms",
+        "Added passport-local strategy for credential verification",
+        "Maintained PostgreSQL session storage with 7-day session TTL",
+        "Updated database schema to include password field in users table",
+        "Removed openid-client dependency to reduce external dependencies",
+        "Authentication now works entirely within your app domain - no external redirects",
+        "IMPORTANT: Existing user accounts require re-registration with new credentials"
+      ]
+    },
+    {
+      "id": "change_20251018_001",
+      "version": "0.2.0",
+      "date": "2025-10-18",
+      "title": "User Authentication System",
+      "category": "feature",
+      "description": "Implemented complete Replit Auth authentication system with PostgreSQL-backed sessions",
+      "details": [
+        "Added secure login via Google, GitHub, X (Twitter), Apple, and email/password",
+        "Integrated Passport.js with OpenID Connect strategy",
+        "Set up PostgreSQL database for user and session storage using Drizzle ORM",
+        "Created useAuth hook for frontend authentication state management",
+        "Added automatic session refresh and 7-day session TTL",
+        "Built authenticated landing page and user profile display"
+      ]
+    },
+    {
+      "id": "change_20251018_002",
+      "version": "0.2.1",
+      "date": "2025-10-18",
+      "title": "Express 5.x Compatibility Fix",
+      "category": "fix",
+      "description": "Fixed compatibility issues between Express 5.x and Next.js",
+      "details": [
+        "Added middleware patch to make req.query writable for Next.js compatibility",
+        "Resolved read-only property errors in Express 5.x",
+        "Ensured smooth integration between Express authentication and Next.js routing"
+      ]
+    },
+    {
+      "id": "change_20251018_003",
+      "version": "0.2.2",
+      "date": "2025-10-18",
+      "title": "User Profile in Viewer Menu",
+      "category": "enhancement",
+      "description": "Updated 3D viewer page to show authenticated user's actual name and profile",
+      "details": [
+        "TopBar component now displays user's first and last name",
+        "Added smart avatar display with profile picture or initials fallback",
+        "Made logout button functional with proper session termination",
+        "Improved user experience with loading states and graceful fallbacks"
+      ]
+    },
+    {
+      "id": "change_20251018_004",
+      "version": "0.3.0",
+      "date": "2025-10-18",
+      "title": "What's New Changelog Feature",
+      "category": "feature",
+      "description": "Added comprehensive changelog system to track and display all app changes",
+      "details": [
+        "Created changelog.json file in data directory for tracking changes",
+        "Built ChangelogModal component with beautiful UI for displaying updates",
+        "Added 'What's New' button to user dropdown menu in TopBar",
+        "Created /api/changelog endpoint to serve changelog data",
+        "Documented all recent changes with versions, categories, and detailed descriptions",
+        "Changes are categorized as: feature, enhancement, fix, or security"
+      ]
+    },
+    {
+      "id": "change_20251018_005",
+      "version": "0.3.1",
+      "date": "2025-10-18",
+      "title": "Improved Changelog Display Order",
+      "category": "enhancement",
+      "description": "Reversed changelog display order to show newest changes first",
+      "details": [
+        "Updated ChangelogModal to reverse the array before displaying",
+        "Newest updates now appear at the top for better user experience"
+      ]
+    },
+    {
+      "id": "change_20251018_006",
+      "version": "1.0.0",
+      "date": "2025-10-18",
+      "title": "Complete Database Migration to PostgreSQL",
+      "category": "feature",
+      "description": "Migrated all project and inspection data from JSON files to PostgreSQL for improved reliability and performance",
+      "details": [
+        "Added projects and inspections tables to database schema with full type safety",
+        "Created automated migration script that successfully transferred all 4 projects and 50 inspections",
+        "Rewrote all API endpoints from JavaScript to TypeScript using Drizzle ORM",
+        "Updated /api/projects endpoint with GET/POST operations on PostgreSQL",
+        "Updated /api/inspections endpoints with full CRUD operations and data validation",
+        "Added element lookup API for fast inspection retrieval by BIM element ID",
+        "Implemented strict data validation requiring valid projectId to prevent orphaned records",
+        "Backed up original JSON files to data/backups/ directory for safety",
+        "All endpoints tested and verified working correctly with PostgreSQL"
+      ]
+    },
+    {
+      "id": "change_20251018_007",
+      "version": "1.0.1",
+      "date": "2025-10-18",
+      "title": "User Tracking for Inspections",
+      "category": "feature",
+      "description": "Added automatic tracking of which user creates and modifies inspection records",
+      "details": [
+        "Added createdByUserId field to track who created each inspection",
+        "Added lastModifiedByUserId field to track who last updated each inspection",
+        "User IDs automatically captured from authenticated session when saving inspections",
+        "Created helper functions for accessing authenticated user data in API routes",
+        "Database schema updated and deployed with new tracking fields",
+        "Provides full audit trail of inspection record changes"
+      ]
+    },
+    {
+      "id": "change_20251018_008",
+      "version": "1.0.2",
+      "date": "2025-10-18",
+      "title": "Security Hardening for User Tracking",
+      "category": "security",
+      "description": "Strengthened audit trail security to prevent tampering with user tracking data",
+      "details": [
+        "Client-supplied user tracking fields are now stripped from all API requests",
+        "Creator ID (createdByUserId) is immutable and cannot be modified after creation",
+        "Last modifier ID (lastModifiedByUserId) is set server-side only on each update",
+        "Original creator is preserved when updating existing inspection records",
+        "Prevents malicious users from spoofing audit trail data",
+        "Ensures reliable and tamper-proof inspection history"
+      ]
+    },
+    {
+      "id": "change_20251018_009",
+      "version": "1.1.0",
+      "date": "2025-10-18",
+      "title": "Interactive Help System",
+      "category": "feature",
+      "description": "Added comprehensive help documentation accessible from the hamburger menu",
+      "details": [
+        "Activated Help button in the top-left hamburger menu (3 lines icon)",
+        "Created detailed help modal with step-by-step instructions for using TWX",
+        "Covers getting started, 3D model navigation, recording inspections, and finding data",
+        "Includes tips and best practices for effective inspection management",
+        "Explains data security and user tracking features",
+        "Beautiful, easy-to-read interface with organized sections and examples",
+        "Accessible from any page in the application"
+      ]
+    },
+    {
+      "id": "change_20251018_010",
+      "version": "1.2.0",
+      "date": "2025-10-18",
+      "title": "Menu Reorganization & New Features",
+      "category": "feature",
+      "description": "Reorganized navigation menu structure and added Settings and Credits pages",
+      "details": [
+        "Moved 'What's New' from user menu to hamburger menu for easier access",
+        "Activated Settings page with application preferences and toggles",
+        "Added Credits page acknowledging academic research and institutions",
+        "Credits highlight Francesco Tizzani's PhD research at NUS",
+        "Links to ETH Zürich Future Cities Laboratory (FCL) programme",
+        "Showcases Circular Future Cities (CFC) research group",
+        "Acknowledges Leighton Asia partnership and Francesco's role as Group Manager of Information Systems & Digital",
+        "Highlights Leighton Asia's contribution of real case projects for testing the research approach",
+        "Includes logos and links to NUS, ETH Zürich, FCL, CFC, and Leighton Asia",
+        "All modals feature responsive design and beautiful UI"
+      ]
+    },
+    {
+      "id": "change_20251018_011",
+      "version": "2.0.0",
+      "date": "2025-10-18",
+      "title": "Material Reuse Tracking System",
+      "category": "feature",
+      "description": "Major new system for tracking temporary works materials as they're reused across construction projects, enabling circular construction practices and complete lifecycle tracking",
+      "details": [
+        "Global Asset Registry: Created centralized database of all physical temporary works elements with unique asset numbers (e.g., 'IfcColumn-2024-000001')",
+        "QR Code Integration: Automatic QR code generation for every element, plus camera scanning to quickly identify and link physical assets",
+        "Element Registration: Easy registration of new temporary works items (props, scaffolding, formwork) with manufacturer details, specifications, and condition tracking",
+        "Element Linking: Link existing physical elements to BIM models in Speckle - same physical asset can appear in different project models",
+        "Transfer Workflow: Dual-approval system requiring both source and destination project managers to approve element transfers between projects",
+        "Complete History Timeline: Visual timeline showing each element's journey through different construction sites with all inspections preserved",
+        "Asset Inventory Page: New 'Assets' page to view and manage all elements with advanced filtering by project, status, and IFC type",
+        "Cross-Project Inspections: Inspection history follows elements across projects while ensuring only one project can actively inspect each element at a time",
+        "Lifecycle Status Tracking: Track element status from active use through in-transit, in-storage, retired, and scrapped",
+        "Material Reuse UI: Integrated element registration and linking directly into the 3D viewer interface for seamless workflow"
+      ]
+    },
+    {
+      "id": "change_20251018_012",
+      "version": "2.0.1",
+      "date": "2025-10-18",
+      "title": "Critical Build Error Fix",
+      "category": "fix",
+      "description": "Fixed module resolution error preventing the application from building and running",
+      "details": [
+        "Resolved 'Module not found: Can't resolve dns' error in Next.js build process",
+        "Created shared constants file to prevent server-side code from being bundled in client-side components",
+        "Separated database-dependent code from shared constants (IFC types, condition types, element status)",
+        "Cleared Next.js build cache to ensure clean compilation",
+        "All components now properly import from shared constants without pulling in PostgreSQL dependencies"
+      ]
+    },
+    {
+      "id": "change_20251019_001",
+      "version": "2.1.0",
+      "date": "2025-10-19",
+      "title": "Draggable Panels with Position Memory",
+      "category": "feature",
+      "description": "Element Details and Project Statistics panels are now draggable and remember their positions across sessions",
+      "details": [
+        "Created reusable useDraggable hook for smooth drag-and-drop panel positioning",
+        "Panels can be dragged anywhere on the screen with mouse",
+        "Panel positions automatically saved to browser localStorage",
+        "Positions restored when you return to the page",
+        "Panels stay within viewport boundaries when dragging",
+        "Reset button on each panel returns it to default position",
+        "Visual feedback with grab cursor and shadow effects while dragging",
+        "SSR-safe implementation prevents hydration issues"
+      ]
+    },
+    {
+      "id": "change_20251019_002",
+      "version": "2.2.0",
+      "date": "2025-10-19",
+      "title": "User Profile Management System",
+      "category": "feature",
+      "description": "Complete user profile management with editable display name, company, and job title",
+      "details": [
+        "Added displayName, company, and title fields to user database schema",
+        "Created beautiful Account Settings modal accessible from user dropdown menu",
+        "Built secure /api/user/profile endpoint for updating profile information",
+        "Email field is read-only for security (managed by authentication provider)",
+        "Real-time profile updates without page refresh",
+        "Enhanced useAuth hook with refreshUser function for instant UI updates",
+        "Form validation ensures data quality",
+        "Success/error feedback keeps you informed",
+        "Optimistic UI updates for responsive feel"
+      ]
+    },
+    {
+      "id": "change_20251019_003",
+      "version": "2.3.0",
+      "date": "2025-10-19",
+      "title": "Improved Panel Controls & Smart Defaults",
+      "category": "enhancement",
+      "description": "Streamlined panel visibility controls with always-visible toggle buttons and smart default behavior",
+      "details": [
+        "Moved panel toggle buttons from bottom of screen to top-right controls area",
+        "Buttons now positioned next to Colors toggle for logical grouping",
+        "Toggle buttons always visible (not just when panels are hidden)",
+        "Active state styling: buttons highlight in orange when panels are open",
+        "Panels default to collapsed on page load for clean, unobstructed 3D view",
+        "Panel visibility preferences saved to localStorage and restored on return",
+        "One-click show/hide toggle for quick access",
+        "Compact icon design matches overall control aesthetic",
+        "Element Details button only appears when you have elements selected"
+      ]
+    },
+    {
+      "id": "change_20251019_004",
+      "version": "2.4.0",
+      "date": "2025-10-19",
+      "title": "Streamlined Interface with Simplified Selection Controls",
+      "category": "enhancement",
+      "description": "Removed redundant UI elements and simplified selection controls for a cleaner, more focused inspection experience",
+      "details": [
+        "Removed Element Details section from Inspection Panel (information now shown in floating panel)",
+        "Eliminated large orange selection indicator box from top-left",
+        "Replaced with compact Hide and Clear buttons in top-left corner",
+        "Fixed Safari scrolling issue on documentation page by correcting viewport overflow settings",
+        "Cleaner interface reduces visual clutter on the 3D viewer",
+        "Simplified selection workflow with direct action buttons",
+        "More screen space dedicated to 3D model visualization"
+      ]
+    },
+    {
+      "id": "change_20251019_005",
+      "version": "2.4.1",
+      "date": "2025-10-19",
+      "title": "Unified Multi-Selection with Shift Key (Speckle Native)",
+      "category": "fix",
+      "description": "Fixed multi-selection to align with Speckle viewer's native Shift key behavior for consistent visual and inspection selection",
+      "details": [
+        "Multi-selection now uses Shift key only (Speckle's native behavior)",
+        "Uses SelectionEvent.multiple property from Speckle viewer API",
+        "Visual highlighting and inspection panel selection now perfectly synchronized",
+        "All selected elements show blue highlighting AND register in inspection panel",
+        "Updated helper text to show 'Hold Shift + click' for multi-selection",
+        "Removed custom Ctrl/Cmd detection in favor of Speckle's built-in system"
+      ]
+    },
+    {
+      "id": "change_20251019_006",
+      "version": "2.4.2",
+      "date": "2025-10-19",
+      "title": "Simplified Hidden Elements Counter",
+      "category": "enhancement",
+      "description": "Cleaned up debug information display to show only essential hidden elements counter",
+      "details": [
+        "Removed verbose debug info box (Project ID, Selected count, Colors status, etc.)",
+        "Replaced with compact 'Hidden: X' counter",
+        "Counter only appears when elements are actually hidden",
+        "Repositioned directly below Hide and Clear buttons in top-left corner",
+        "Cleaner, more focused interface with less visual clutter",
+        "Small badge design with semi-transparent dark background"
+      ]
+    },
+    {
+      "id": "change_20251019_007",
+      "version": "2.4.3",
+      "date": "2025-10-19",
+      "title": "Resizable Inspection Panel & Floating Asset Registration",
+      "category": "feature",
+      "description": "Fully functional inspection panel width adjustment and new floating Asset Registration modal for easier asset management",
+      "details": [
+        "Inspection panel now defaults to 33% of viewport width on first load",
+        "Panel width fully adjustable by dragging the invisible left edge (glows orange on hover)",
+        "Drag handle intercepts events before Speckle viewer to enable smooth resizing",
+        "Width adjustable from 380px (minimum) to 800px (maximum)",
+        "Custom panel widths automatically saved and restored on page reload",
+        "Resize handle is transparent by default, highlights in orange when hovered",
+        "Created new floating Asset Registration panel accessible from hamburger menu",
+        "Asset Registration modal appears centered and can be dragged anywhere",
+        "Modal position persists across sessions via localStorage",
+        "Separate menu items: 'Asset Registration' (floating modal) and 'Asset Inventory' (full page)",
+        "Escape key closes the Asset Registration panel"
+      ]
+    },
+    {
+      "id": "change_20251019_008",
+      "version": "2.4.4",
+      "date": "2025-10-19",
+      "title": "Streamlined Asset Registration Workflow",
+      "category": "enhancement",
+      "description": "Complete redesign of asset registration for one-click access with registration form appearing immediately in a floating panel",
+      "details": [
+        "Removed 'Asset Registration' from hamburger menu to reduce interface clutter",
+        "Asset registration now only accessible via 'Register New Asset' button in Inspection Panel",
+        "Registration form appears immediately inside floating panel - no double-click needed",
+        "Selected element data automatically passed to registration form",
+        "Floating panel enlarged to 850px width to accommodate full registration form",
+        "Panel remains draggable with persistent positioning across sessions",
+        "Context-aware workflow ensures registration happens with BIM element already selected",
+        "Single-step process: Select element → Click Register → Fill form → Done"
+      ]
+    },
+    {
+      "id": "change_20251019_009",
+      "version": "2.4.5",
+      "date": "2025-10-19",
+      "title": "Simplified Asset Registration Form",
+      "category": "enhancement",
+      "description": "Dramatically simplified asset registration form with automatic data extraction from BIM elements and streamlined user input",
+      "details": [
+        "Asset Number now auto-generated as IFC-Type-XXXXXX (e.g., IfcColumn-000001) - no year needed",
+        "IFC Type automatically extracted from selected BIM element and displayed (read-only)",
+        "Element Name pre-filled from BIM element, editable by user",
+        "Length automatically extracted from element properties when available",
+        "Only required field: Current Condition dropdown (Excellent, Good, Fair, Poor, etc.)",
+        "New optional Remarks field for additional notes",
+        "Removed unnecessary fields: manufacturer, serial number, purchase date, purchase value, asset type, category, capacity, material grade",
+        "Clean, focused form with just 5 fields total (1 required, 4 optional/auto-filled)",
+        "Database schema updated with new 'remarks' field",
+        "Success screen shows asset number, element name, length (if provided), condition, and remarks"
+      ]
+    },
+    {
+      "id": "change_20251019_010",
+      "version": "2.5.0",
+      "date": "2025-10-19",
+      "title": "Enhanced Asset Inventory with QR Codes, BIM Linkages, and Inspections",
+      "category": "feature",
+      "description": "Comprehensive Asset Inventory enhancements showing QR codes, linked BIM elements across projects, and complete inspection history",
+      "details": [
+        "Added expandable asset rows with 'Details' button to show comprehensive asset information",
+        "QR codes displayed as scannable images for each asset with code text underneath",
+        "Shows all BIM elements from all projects linked to each physical asset",
+        "Lists which Speckle models and projects each asset is associated with",
+        "Displays complete inspection history for all linked BIM elements",
+        "New API endpoint /api/elements/[id]/details for fetching comprehensive asset data",
+        "QR code generation using qrcode library with data URL format",
+        "Three-column expandable layout: QR Code, Linked BIM Elements, Inspections",
+        "Each linked element shows project name, element ID, and optional Speckle object URL",
+        "Inspections show date, status, inspector, and notes for full traceability",
+        "Responsive design collapses to single column on mobile devices",
+        "Details panel styled with orange-accented cards matching TWX theme"
+      ]
+    },
+    {
+      "id": "change_20251019_011",
+      "version": "2.5.1",
+      "date": "2025-10-19",
+      "title": "PDF Export for Asset Information",
+      "category": "feature",
+      "description": "Added PDF export functionality to Asset Inventory allowing users to generate comprehensive PDF reports for individual assets",
+      "details": [
+        "New 'PDF' button added to actions column in Asset Inventory table",
+        "Generates professional PDF report with complete asset information",
+        "PDF includes: Asset Number, IFC Type, Description, Status, Condition, Project, Serial Number, Manufacturer, Length",
+        "QR code automatically embedded as scannable image in PDF",
+        "Lists all linked BIM elements from all projects with element IDs and URLs",
+        "Includes inspection history with dates, inspectors, statuses, and notes (up to 10 most recent)",
+        "Multi-page support with automatic page breaks for long content",
+        "Professional formatting with branded TWX footer on each page",
+        "PDF filename automatically generated as TWX-Asset-[AssetNumber].pdf",
+        "Uses jsPDF library for client-side PDF generation"
+      ]
+    },
+    {
+      "id": "change_20251019_012",
+      "version": "2.5.2",
+      "date": "2025-10-19",
+      "title": "Fixed IFC Type Extraction and Display Name Update",
+      "category": "fix",
+      "description": "Fixed critical bugs affecting asset registration and user profile display",
+      "details": [
+        "Fixed IFC Type extraction in Asset Registration - now correctly shows IFCBEAM, IFCCOLUMN, etc. instead of generic IfcBuildingElementProxy",
+        "Removed redundant extractIfcType function - now uses normalized property directly from ViewerCore",
+        "Ensured consistent property access across Element Details panel and Registration modal",
+        "ViewerCore now sets both 'ifcType' and '_extractedIFCType' properties for consistency",
+        "Fixed display name not updating in top-right corner after profile changes",
+        "TopBar now correctly checks user.displayName instead of non-existent firstName/lastName properties",
+        "Asset numbers now accurately reflect actual IFC type (e.g., 'IFCBEAM-000001' instead of 'IfcBuildingElementProxy-000001')",
+        "Improved data flow consistency: ViewerCore → InspectionPanel → ElementRegistrationModal all use same normalized properties"
+      ]
+    }
+  ],
+  "metadata": {
+    "lastUpdate": "2025-10-19T11:07:00Z",
+    "totalChanges": 24,
+    "currentVersion": "2.5.2"
+  }
+}
